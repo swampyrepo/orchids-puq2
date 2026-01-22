@@ -1,0 +1,282 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { supabaseClient } from "@/lib/supabase-client";
+
+export default function RegisterPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+  const [theme, setTheme] = useState<string>("light");
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") || "light";
+    let activeTheme = savedTheme;
+    if (savedTheme === "system") {
+      activeTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    setTheme(activeTheme);
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === "light" ? "dark" : "light";
+    setTheme(newTheme);
+    localStorage.setItem("theme", newTheme);
+    document.documentElement.setAttribute("data-bs-theme", newTheme);
+  };
+
+  const validatePassword = (pwd: string): string | null => {
+    if (pwd.length < 8) {
+      return "Password minimal 8 karakter";
+    }
+    const numbers = pwd.match(/\d/g);
+    if (!numbers || numbers.length < 1) {
+      return "Password harus mengandung minimal 1 angka";
+    }
+    const symbols = pwd.match(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/g);
+    const uniqueSymbols = symbols ? [...new Set(symbols)] : [];
+    if (uniqueSymbols.length < 2) {
+      return "Password harus mengandung minimal 2 simbol unik";
+    }
+    return null;
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (password !== confirmPassword) {
+      setError("Password tidak cocok");
+      return;
+    }
+
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
+
+    setLoading(true);
+
+    const { error } = await supabaseClient.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    } else {
+      setSuccess(true);
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    const { error } = await supabaseClient.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    }
+  };
+
+  const getPasswordStrength = () => {
+    if (!password) return { width: "0%", color: "#e9ecef", text: "" };
+    let strength = 0;
+    if (password.length >= 8) strength++;
+    if (/\d/.test(password)) strength++;
+    const symbols = password.match(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/g);
+    const uniqueSymbols = symbols ? [...new Set(symbols)] : [];
+    if (uniqueSymbols.length >= 1) strength++;
+    if (uniqueSymbols.length >= 2) strength++;
+
+    const levels = [
+      { width: "25%", color: "#dc3545", text: "Lemah" },
+      { width: "50%", color: "#fd7e14", text: "Cukup" },
+      { width: "75%", color: "#ffc107", text: "Baik" },
+      { width: "100%", color: "#28a745", text: "Kuat" },
+    ];
+    return levels[strength - 1] || { width: "0%", color: "#e9ecef", text: "" };
+  };
+
+  const strength = getPasswordStrength();
+
+  const bgGradient = theme === "dark" 
+    ? "linear-gradient(135deg, #1e1e2d 0%, #232333 100%)" 
+    : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+
+  if (success) {
+    return (
+      <div className="min-vh-100 d-flex align-items-center justify-content-center position-relative" style={{ background: bgGradient }}>
+        <button
+          onClick={toggleTheme}
+          className="btn btn-icon position-absolute top-0 end-0 m-3"
+          style={{ 
+            width: "40px", 
+            height: "40px", 
+            borderRadius: "50%",
+            background: theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.3)",
+            border: "none"
+          }}
+        >
+          {theme === "dark" ? (
+            <i className="ri-sun-line" style={{ color: "#fff", fontSize: "18px" }}></i>
+          ) : (
+            <i className="ri-moon-line" style={{ color: "#fff", fontSize: "18px" }}></i>
+          )}
+        </button>
+        <div className="card shadow-lg text-center" style={{ maxWidth: "420px", width: "100%", borderRadius: "16px" }}>
+          <div className="card-body p-5">
+            <div className="mb-4">
+              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#28a745" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M9 12l2 2 4-4" />
+              </svg>
+            </div>
+            <h4 className="fw-bold mb-3">Pendaftaran Berhasil!</h4>
+            <p className="text-muted">Silakan cek email Anda untuk verifikasi akun.</p>
+            <a href="/login" className="btn btn-primary mt-3" style={{ borderRadius: "8px" }}>
+              Kembali ke Login
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-vh-100 d-flex align-items-center justify-content-center position-relative" style={{ background: bgGradient }}>
+      <button
+        onClick={toggleTheme}
+        className="btn btn-icon position-absolute top-0 end-0 m-3"
+        style={{ 
+          width: "40px", 
+          height: "40px", 
+          borderRadius: "50%",
+          background: theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.3)",
+          border: "none"
+        }}
+        title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+      >
+        {theme === "dark" ? (
+          <i className="ri-sun-line" style={{ color: "#fff", fontSize: "18px" }}></i>
+        ) : (
+          <i className="ri-moon-line" style={{ color: "#fff", fontSize: "18px" }}></i>
+        )}
+      </button>
+      <div className="card shadow-lg" style={{ maxWidth: "420px", width: "100%", borderRadius: "16px" }}>
+        <div className="card-body p-5">
+          <div className="text-center mb-4">
+            <img src="https://visora-dev-assets-id.assetsvsiddev.workers.dev/index/base-logo.png" alt="Logo" width="120" className="mb-3" />
+            <h4 className="fw-bold mb-1">Buat Akun Baru</h4>
+            <p className="text-muted small">Daftar untuk mulai menggunakan layanan</p>
+          </div>
+
+          {error && (
+            <div className="alert alert-danger py-2 small" role="alert">
+              {error}
+            </div>
+          )}
+
+          <button
+            onClick={handleGoogleLogin}
+            disabled={loading}
+            className="btn btn-outline-secondary w-100 mb-3 d-flex align-items-center justify-content-center gap-2"
+            style={{ height: "48px", borderRadius: "8px" }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Daftar dengan Google
+          </button>
+
+          <div className="d-flex align-items-center my-4">
+            <hr className="flex-grow-1" />
+            <span className="px-3 text-muted small">atau</span>
+            <hr className="flex-grow-1" />
+          </div>
+
+          <form onSubmit={handleRegister}>
+            <div className="mb-3">
+              <label className="form-label small fw-medium">Email</label>
+              <input
+                type="email"
+                className="form-control"
+                placeholder="nama@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                style={{ height: "48px", borderRadius: "8px" }}
+              />
+            </div>
+            <div className="mb-3">
+              <label className="form-label small fw-medium">Password</label>
+              <input
+                type="password"
+                className="form-control"
+                placeholder="Minimal 8 karakter, 2 simbol, 1 angka"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                style={{ height: "48px", borderRadius: "8px" }}
+              />
+              {password && (
+                <div className="mt-2">
+                  <div className="progress" style={{ height: "4px" }}>
+                    <div
+                      className="progress-bar"
+                      style={{ width: strength.width, backgroundColor: strength.color }}
+                    />
+                  </div>
+                  <small style={{ color: strength.color }}>{strength.text}</small>
+                </div>
+              )}
+            </div>
+            <div className="mb-4">
+              <label className="form-label small fw-medium">Konfirmasi Password</label>
+              <input
+                type="password"
+                className="form-control"
+                placeholder="Ulangi password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                style={{ height: "48px", borderRadius: "8px" }}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn w-100 text-white"
+              style={{ height: "48px", borderRadius: "8px", background: "linear-gradient(to right, #4361EE, #1D92F1)" }}
+            >
+              {loading ? "Memproses..." : "Daftar"}
+            </button>
+          </form>
+
+          <p className="text-center mt-4 mb-0 small">
+            Sudah punya akun?{" "}
+            <a href="/login" className="text-primary fw-medium text-decoration-none">
+              Masuk
+            </a>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
